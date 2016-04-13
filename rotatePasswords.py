@@ -12,6 +12,7 @@ rotatePasswords.py --config myconf.yml
 """
 
 import argparse
+from paramiko import client
 import random
 import string
 import sys
@@ -20,9 +21,15 @@ import MySQLdb
 
 PASS_CHARS = string.ascii_letters + string.digits
 
-def RotateUser(username, hostname, db):
+def RotateUser(username, hostname, db, ssh):
   newpass = ''.join(random.choice(PASS_CHARS) for _ in xrange(20))
-  print newpass
+
+  ssh.connect(hostname, username='irsec')
+  sftp = ssh.open_sftp()
+  f = sftp.file('/home/irsec/password', 'w')
+  f.write(newpass)
+  f.close()
+  sftp.close()
 
 def main():
   parser = argparse.ArgumentParser()
@@ -42,6 +49,9 @@ def main():
       port=config['port'],
       passwd=config['password'])
 
+  ssh = client.SSHClient()
+  client.load_system_host_keys()
+
   if args.users:
     users = args.users.split(',')
   else:
@@ -53,7 +63,7 @@ def main():
     except KeyError:
       print >>sys.stderr, 'User %s not configured' % user
       continue
-    RotateUser(user, hostname, db)
+    RotateUser(user, hostname, db, ssh)
 
 if __name__ == '__main__':
   main()
