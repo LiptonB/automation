@@ -1,7 +1,7 @@
 db:
   hostname: localhost
   port: 3306
-  username: kittencoin
+  user: kittencoin
   password: KittyPasswordy0
   db: KittenCoin
 ssh:
