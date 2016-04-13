@@ -1,9 +1,9 @@
 db:
   hostname: localhost
-  port: '3306'
+  port: 3306
   username: kittencoin
-  password: kittencoin
-  db: kittencoin
+  password: KittyPasswordy0
+  db: KittenCoin
 ssh:
   user: irsec
   filename: /home/irsec/password
