@@ -1,0 +1,8 @@
+db:
+  hostname: localhost
+  port: '3306'
+  username: kittencoin
+  password: kittencoin
+users:
+  team1: www.team1.com
+  team2: www.team2.com
