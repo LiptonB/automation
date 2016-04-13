@@ -22,6 +22,7 @@ import MySQLdb
 PASS_CHARS = string.ascii_letters + string.digits
 
 def dbConnect(db_config):
+  """Open a connection to the database."""
   return MySQLdb.connect(
       host=db_config['hostname'],
       port=db_config['port'],
@@ -30,6 +31,12 @@ def dbConnect(db_config):
       db=db_config['db'])
 
 class sshPasswordUpdater(object):
+  """Convenience class for updating password files via SSH.
+
+  Username for connections and the filename to update on the remote hosts are
+  set via the config dict at initialization time, and then used for each call to
+  the UpdatePassword method.
+  """
   def __init__(self, ssh_config):
     self.ssh = client.SSHClient()
     self.ssh.load_system_host_keys()
@@ -45,6 +52,11 @@ class sshPasswordUpdater(object):
     sftp.close()
 
 def RotateUser(username, hostname, db, ssh):
+  """Rotate the password of a user in database and via SSH.
+
+  Generates a new password, then uses the provided database and SSH clients to
+  set that as the user's password.
+  """
   newpass = ''.join(random.choice(PASS_CHARS) for _ in xrange(20))
 
   try:
@@ -79,18 +91,22 @@ def main():
   config = yaml.safe_load(config_file)
   config_file.close()
 
+  # Set up connections
   db = dbConnect(config['db'])
   ssh = sshPasswordUpdater(config['ssh'])
+
+  # Determine users to update
   if args.users:
     users = args.users.split(',')
   else:
     users = config['users'].keys()
 
+  # Perform updates
   for user in users:
     try:
       hostname = config['users'][user]
     except KeyError:
-      print 'User %s not configured' % user
+      print 'User %s not in config file' % user
       continue
     RotateUser(user, hostname, db, ssh)
 
