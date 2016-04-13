@@ -21,15 +21,38 @@ import MySQLdb
 
 PASS_CHARS = string.ascii_letters + string.digits
 
+def dbConnect(db_config):
+  return MySQLdb.connect(
+      host=db_config['hostname'],
+      port=db_config['port'],
+      user=db_config['user'],
+      passwd=db_config['password'],
+      db=db_config['db'])
+
+class sshPasswordUpdater(object):
+  def __init__(self, ssh_config):
+    self.ssh = client.SSHClient()
+    client.load_system_host_keys()
+    self.username = ssh_config['user']
+    self.filename = ssh_config['filename']
+
+  def UpdatePassword(hostname, password):
+    self.ssh.connect(hostname, username=self.username)
+    sftp = self.ssh.open_sftp()
+    f = sftp.file(self.filename, 'w')
+    f.write(password)
+    f.close()
+    sftp.close()
+
 def RotateUser(username, hostname, db, ssh):
   newpass = ''.join(random.choice(PASS_CHARS) for _ in xrange(20))
 
-  ssh.connect(hostname, username='irsec')
-  sftp = ssh.open_sftp()
-  f = sftp.file('/home/irsec/password', 'w')
-  f.write(newpass)
-  f.close()
-  sftp.close()
+  ssh.UpdatePassword(hostname, newpass)
+
+  c = db.cursor()
+  c.execute("UPDATE users SET password='%s' where username='%s'",
+      (newpass, username))
+  c.close()
 
 def main():
   parser = argparse.ArgumentParser()
@@ -43,15 +66,8 @@ def main():
   config = yaml.safe_load(config_file)
   config_file.close()
 
-  db = MySQLdb.connect(
-      host=config['hostname'],
-      user=config['user'],
-      port=config['port'],
-      passwd=config['password'])
-
-  ssh = client.SSHClient()
-  client.load_system_host_keys()
-
+  db = dbConnect(config['db'])
+  ssh = sshPasswordUpdater(config['ssh'])
   if args.users:
     users = args.users.split(',')
   else:
