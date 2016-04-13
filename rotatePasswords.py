@@ -12,10 +12,10 @@ rotatePasswords.py --config myconf.yml
 """
 
 import argparse
-from paramiko import client
+from paramiko import client, ssh_exception
 import random
+import socket
 import string
-import sys
 import yaml
 import MySQLdb
 
@@ -32,27 +32,40 @@ def dbConnect(db_config):
 class sshPasswordUpdater(object):
   def __init__(self, ssh_config):
     self.ssh = client.SSHClient()
-    client.load_system_host_keys()
+    self.ssh.load_system_host_keys()
     self.username = ssh_config['user']
     self.filename = ssh_config['filename']
 
-  def UpdatePassword(hostname, password):
+  def UpdatePassword(self, hostname, password):
     self.ssh.connect(hostname, username=self.username)
     sftp = self.ssh.open_sftp()
     f = sftp.file(self.filename, 'w')
-    f.write(password)
+    f.write(password + '\n')
     f.close()
     sftp.close()
 
 def RotateUser(username, hostname, db, ssh):
   newpass = ''.join(random.choice(PASS_CHARS) for _ in xrange(20))
 
-  ssh.UpdatePassword(hostname, newpass)
+  try:
+    ssh.UpdatePassword(hostname, newpass)
+  except (ssh_exception.SSHException, socket.error) as e:
+    print 'Error updating password for %s on %s via SSH: %s' % (
+        username, hostname, e)
 
-  c = db.cursor()
-  c.execute("UPDATE users SET password='%s' where username='%s'",
-      (newpass, username))
-  c.close()
+  try:
+    c = db.cursor()
+    c.execute("UPDATE users SET password=%s where name=%s",
+        (newpass, username))
+    db.commit()
+    if not c.rowcount:
+      print 'Username %s not found in database' % username
+    elif c.rowcount > 1:
+      print 'Too many entries for user %s found in database' % username
+  except MySQLdb.MySQLError as e:
+    print 'Error updating %s in database: %s' % (username, e)
+  finally:
+    c.close()
 
 def main():
   parser = argparse.ArgumentParser()
@@ -77,7 +90,7 @@ def main():
     try:
       hostname = config['users'][user]
     except KeyError:
-      print >>sys.stderr, 'User %s not configured' % user
+      print 'User %s not configured' % user
       continue
     RotateUser(user, hostname, db, ssh)
 
