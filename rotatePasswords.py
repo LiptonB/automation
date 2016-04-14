@@ -12,6 +12,7 @@ rotatePasswords.py --config myconf.yml
 """
 
 import argparse
+import hashlib
 from paramiko import client, ssh_exception
 import random
 import socket
@@ -58,6 +59,7 @@ def RotateUser(username, hostname, db, ssh):
   set that as the user's password.
   """
   newpass = ''.join(random.choice(PASS_CHARS) for _ in xrange(20))
+  md5pass = hashlib.md5(newpass).hexdigest()
 
   try:
     ssh.UpdatePassword(hostname, newpass)
@@ -68,7 +70,7 @@ def RotateUser(username, hostname, db, ssh):
   try:
     c = db.cursor()
     c.execute("UPDATE users SET password=%s where name=%s",
-        (newpass, username))
+        (md5pass, username))
     db.commit()
     if not c.rowcount:
       print 'Username %s not found in database' % username
