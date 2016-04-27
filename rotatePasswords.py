@@ -17,10 +17,13 @@ from paramiko import client, ssh_exception
 import random
 import socket
 import string
+import time
 import yaml
 import MySQLdb
 
 PASS_CHARS = string.ascii_letters + string.digits
+RETRIES = 5
+
 
 def dbConnect(db_config):
   """Open a connection to the database."""
@@ -30,6 +33,7 @@ def dbConnect(db_config):
       user=db_config['user'],
       passwd=db_config['password'],
       db=db_config['db'])
+
 
 class sshPasswordUpdater(object):
   """Convenience class for updating password files via SSH.
@@ -43,14 +47,58 @@ class sshPasswordUpdater(object):
     self.ssh.load_system_host_keys()
     self.username = ssh_config['user']
     self.filename = ssh_config['filename']
+    self.todo = {}
 
   def UpdatePassword(self, hostname, password):
+    """Attempt to perform update, record todo if error."""
+    try:
+      self.DoUpdate(hostname, password)
+    except (ssh_exception.SSHException, socket.error) as e:
+      print 'Error updating password on %s via SSH: %s' % (hostname, e)
+      self.todo[hostname] = password
+
+  def DoUpdate(self, hostname, password):
+    """Actually perform the update by connecting to host over SSH."""
     self.ssh.connect(hostname, username=self.username)
     sftp = self.ssh.open_sftp()
     f = sftp.file(self.filename, 'w')
     f.write(password + '\n')
     f.close()
     sftp.close()
+
+  def RetryFailedUpdates(self):
+    """Retry all failed updates up to RETRIES times."""
+    for i in range(RETRIES):
+      for hostname, password in self.todo.items():
+        print 'Retrying update of password on %s (Attempt %d of %d)' % (
+            hostname, i+1, RETRIES)
+        try:
+          self.DoUpdate(hostname, password)
+          del self.todo[hostname]
+        except (ssh_exception.SSHException, socket.error) as e:
+          print 'Error updating password on %s via SSH: %s' % (hostname, e)
+      time.sleep(2**i)
+
+
+def DbUpdate(db, username, md5pass):
+  try:
+    c = db.cursor()
+    c.execute("UPDATE users SET password=%s where name=%s",
+        (md5pass, username))
+    db.commit()
+  except MySQLdb.MySQLError as e:
+    print 'Error updating %s in database: %s' % (username, e)
+    return False
+  finally:
+    c.close()
+
+  if not c.rowcount:
+    print 'Username %s not found in database' % username
+    return False
+  elif c.rowcount > 1:
+    print 'Warning: Too many entries for user %s found in database' % username
+  return True
+
 
 def RotateUser(username, hostname, db, ssh):
   """Rotate the password of a user in database and via SSH.
@@ -61,25 +109,11 @@ def RotateUser(username, hostname, db, ssh):
   newpass = ''.join(random.choice(PASS_CHARS) for _ in xrange(20))
   md5pass = hashlib.md5(newpass).hexdigest()
 
-  try:
-    ssh.UpdatePassword(hostname, newpass)
-  except (ssh_exception.SSHException, socket.error) as e:
-    print 'Error updating password for %s on %s via SSH: %s' % (
-        username, hostname, e)
+  db_success = DbUpdate(db, username, md5pass)
 
-  try:
-    c = db.cursor()
-    c.execute("UPDATE users SET password=%s where name=%s",
-        (md5pass, username))
-    db.commit()
-    if not c.rowcount:
-      print 'Username %s not found in database' % username
-    elif c.rowcount > 1:
-      print 'Too many entries for user %s found in database' % username
-  except MySQLdb.MySQLError as e:
-    print 'Error updating %s in database: %s' % (username, e)
-  finally:
-    c.close()
+  if db_success:
+    ssh.UpdatePassword(hostname, newpass)
+
 
 def main():
   parser = argparse.ArgumentParser()
@@ -111,6 +145,9 @@ def main():
       print 'User %s not in config file' % user
       continue
     RotateUser(user, hostname, db, ssh)
+
+  ssh.RetryFailedUpdates()
+
 
 if __name__ == '__main__':
   main()
