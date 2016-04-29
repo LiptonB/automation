@@ -58,6 +58,7 @@ class sshPasswordUpdater(object):
 
   def UpdatePassword(self, hostname, password):
     """Attempt to perform update, record todo if error."""
+    print 'Updating password via SSH for %s' % hostname
     try:
       self.DoUpdate(hostname, password)
     except (ssh_exception.SSHException, socket.error) as e:
@@ -91,6 +92,7 @@ class sshPasswordUpdater(object):
 
 
 def DbUpdate(db, username, md5pass):
+  print 'Updating DB password for %s' % username
   try:
     c = db.cursor()
     c.execute("UPDATE users SET password=%s where name=%s",
