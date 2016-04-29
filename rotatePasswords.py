@@ -42,7 +42,7 @@ class sshPasswordUpdater(object):
   set via the config dict at initialization time, and then used for each call to
   the UpdatePassword method.
   """
-  def __init__(self, ssh_config):
+  def __init__(self, ssh_config, accept_all):
     self.username = ssh_config['user']
     self.filename = ssh_config['filename']
     self.key = ssh_config['key']
@@ -52,6 +52,8 @@ class sshPasswordUpdater(object):
     self.ssh.load_system_host_keys()
     if self.hostkeys:
         self.ssh.load_host_keys(self.hostkeys)
+    if accept_all:
+        self.ssh.set_missing_host_key_policy(AutoAddPolicy())
     self.todo = {}
 
   def UpdatePassword(self, hostname, password):
@@ -83,6 +85,9 @@ class sshPasswordUpdater(object):
         except (ssh_exception.SSHException, socket.error) as e:
           print 'Error updating password on %s via SSH: %s' % (hostname, e)
       time.sleep(2**i)
+
+  def SaveHostKeys(self):
+    self.ssh.save_host_keys()
 
 
 def DbUpdate(db, username, md5pass):
@@ -126,6 +131,8 @@ def main():
       help='Comma-separated list of users whose passwords should be updated')
   parser.add_argument('--config', default='config.yml',
       help='Alternative config file to use (default is config.yml)')
+  parser.add_argument('--accept', type=bool,
+      help='Accept all SSH host keys permanently')
   args = parser.parse_args()
 
   config_file = open(args.config)
@@ -134,7 +141,7 @@ def main():
 
   # Set up connections
   db = dbConnect(config['db'])
-  ssh = sshPasswordUpdater(config['ssh'])
+  ssh = sshPasswordUpdater(config['ssh'], args.accept)
 
   # Determine users to update
   if args.users:
@@ -152,6 +159,7 @@ def main():
     RotateUser(user, hostname, db, ssh)
 
   ssh.RetryFailedUpdates()
+  ssh.SaveHostKeys()
 
 
 if __name__ == '__main__':
