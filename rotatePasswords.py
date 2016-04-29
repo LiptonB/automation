@@ -87,7 +87,7 @@ class sshPasswordUpdater(object):
       time.sleep(2**i)
 
   def SaveHostKeys(self):
-    self.ssh.save_host_keys()
+    self.ssh.save_host_keys(self.hostkeys)
 
 
 def DbUpdate(db, username, md5pass):
