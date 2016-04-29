@@ -77,6 +77,8 @@ class sshPasswordUpdater(object):
   def RetryFailedUpdates(self):
     """Retry all failed updates up to RETRIES times."""
     for i, retry_time in enumerate(RETRIES):
+      if not self.todo:
+        break
       time.sleep(retry_time)
       for hostname, password in self.todo.items():
         print 'Retrying update of password on %s (Attempt %d of %d)' % (
