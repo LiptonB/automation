@@ -7,6 +7,8 @@ db:
 ssh:
   user: irsec
   filename: /home/irsec/password
+  key: /home/irsec/.ssh/id_rsa
+  hostkeys: /home/irsec/kittencoin_host_keys
 users:
   team1: kcbox.team1.com
   team2: kcbox.team2.com

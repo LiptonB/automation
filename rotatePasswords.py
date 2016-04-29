@@ -43,10 +43,15 @@ class sshPasswordUpdater(object):
   the UpdatePassword method.
   """
   def __init__(self, ssh_config):
-    self.ssh = client.SSHClient()
-    self.ssh.load_system_host_keys()
     self.username = ssh_config['user']
     self.filename = ssh_config['filename']
+    self.key = ssh_config['key']
+    self.hostkeys = ssh_config.get('hostkeys')
+
+    self.ssh = client.SSHClient()
+    self.ssh.load_system_host_keys()
+    if self.hostkeys:
+        self.ssh.load_host_keys(self.hostkeys)
     self.todo = {}
 
   def UpdatePassword(self, hostname, password):
@@ -59,7 +64,7 @@ class sshPasswordUpdater(object):
 
   def DoUpdate(self, hostname, password):
     """Actually perform the update by connecting to host over SSH."""
-    self.ssh.connect(hostname, username=self.username)
+    self.ssh.connect(hostname, username=self.username, key_filename=self.key)
     sftp = self.ssh.open_sftp()
     f = sftp.file(self.filename, 'w')
     f.write(password + '\n')
