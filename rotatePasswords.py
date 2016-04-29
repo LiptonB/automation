@@ -53,7 +53,7 @@ class sshPasswordUpdater(object):
     if self.hostkeys:
         self.ssh.load_host_keys(self.hostkeys)
     if accept_all:
-        self.ssh.set_missing_host_key_policy(AutoAddPolicy())
+        self.ssh.set_missing_host_key_policy(client.AutoAddPolicy())
     self.todo = {}
 
   def UpdatePassword(self, hostname, password):
@@ -131,7 +131,7 @@ def main():
       help='Comma-separated list of users whose passwords should be updated')
   parser.add_argument('--config', default='config.yml',
       help='Alternative config file to use (default is config.yml)')
-  parser.add_argument('--accept', type=bool,
+  parser.add_argument('--accept', action='store_true',
       help='Accept all SSH host keys permanently')
   args = parser.parse_args()
 
