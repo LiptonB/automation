@@ -22,7 +22,7 @@ import yaml
 import MySQLdb
 
 PASS_CHARS = string.ascii_letters + string.digits
-RETRIES = 5
+RETRIES = [5*60] * 29
 
 
 def dbConnect(db_config):
@@ -75,7 +75,8 @@ class sshPasswordUpdater(object):
 
   def RetryFailedUpdates(self):
     """Retry all failed updates up to RETRIES times."""
-    for i in range(RETRIES):
+    for i, retry_time in enumerate(RETRIES):
+      time.sleep(retry_time)
       for hostname, password in self.todo.items():
         print 'Retrying update of password on %s (Attempt %d of %d)' % (
             hostname, i+1, RETRIES)
@@ -84,7 +85,6 @@ class sshPasswordUpdater(object):
           del self.todo[hostname]
         except (ssh_exception.SSHException, socket.error) as e:
           print 'Error updating password on %s via SSH: %s' % (hostname, e)
-      time.sleep(2**i)
 
   def SaveHostKeys(self):
     self.ssh.save_host_keys(self.hostkeys)
