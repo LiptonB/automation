@@ -1,3 +1,5 @@
 #!/bin/bash
 
-timeout --kill-after=1h 50m ./rotatePasswords.py >> rotate.log 2>&1
+export PYTHONUNBUFFERED=1
+cd $(dirname $0)
+timeout --kill-after=1h 50m ./rotatePasswords.py &>> rotate.log

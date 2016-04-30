@@ -12,6 +12,7 @@ rotatePasswords.py --config myconf.yml
 """
 
 import argparse
+import datetime
 import hashlib
 from paramiko import client, ssh_exception
 import random
@@ -22,7 +23,7 @@ import yaml
 import MySQLdb
 
 PASS_CHARS = string.ascii_letters + string.digits
-RETRIES = [5*60] * 29
+RETRIES = [5*60] * 6
 
 
 def dbConnect(db_config):
@@ -67,7 +68,8 @@ class sshPasswordUpdater(object):
 
   def DoUpdate(self, hostname, password):
     """Actually perform the update by connecting to host over SSH."""
-    self.ssh.connect(hostname, username=self.username, key_filename=self.key)
+    self.ssh.connect(hostname, username=self.username, key_filename=self.key,
+	timeout=10, banner_timeout=10)
     sftp = self.ssh.open_sftp()
     f = sftp.file(self.filename, 'w')
     f.write(password + '\n')
@@ -82,10 +84,11 @@ class sshPasswordUpdater(object):
       time.sleep(retry_time)
       for hostname, password in self.todo.items():
         print 'Retrying update of password on %s (Attempt %d of %d)' % (
-            hostname, i+1, RETRIES)
+            hostname, i+1, len(RETRIES))
         try:
           self.DoUpdate(hostname, password)
           del self.todo[hostname]
+	  print 'Retry of %s succeeded' % hostname
         except (ssh_exception.SSHException, socket.error) as e:
           print 'Error updating password on %s via SSH: %s' % (hostname, e)
 
@@ -142,6 +145,8 @@ def main():
   config_file = open(args.config)
   config = yaml.safe_load(config_file)
   config_file.close()
+
+  print 'Beginning run at %s' % datetime.datetime.now()
 
   # Set up connections
   db = dbConnect(config['db'])
